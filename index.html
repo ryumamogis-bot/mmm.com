@@ -42,7 +42,7 @@
     <p id="result-detail"></p>
   </div>
   <div id="start-hint">
-    <strong>操作方法:</strong> 十字キーの上下左右で回答
+    <strong>操作方法:</strong> A / B / X / Y で回答
   </div>
 </div>
 
@@ -69,7 +69,12 @@ const LEVELS = [
 ];
 
 const DIRS = ['up', 'down', 'left', 'right'];
-const BTNS = { up: 12, down: 13, left: 14, right: 15 };
+const BTNS = {
+  up: 2,
+  down: 0,
+  left: 3,
+  right: 1
+};
 
 let levelIdx = 0;
 let score = 0;
