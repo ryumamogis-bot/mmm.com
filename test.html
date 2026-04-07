@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<body>
+<h2>ボタン番号テスター</h2>
+<p>Pro Controller の A / B / X / Y を押して番号を確認してください。</p>
+<pre id="out"></pre>
+
+<script>
+function loop() {
+  const gps = navigator.getGamepads();
+  let txt = "";
+  for (let i = 0; i < gps.length; i++) {
+    const gp = gps[i];
+    if (!gp) continue;
+    txt += "Gamepad: " + gp.id + "\n";
+    gp.buttons.forEach((b, idx) => {
+      if (b.pressed) txt += "Button " + idx + " PRESSED\n";
+    });
+  }
+  document.getElementById("out").textContent = txt;
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
