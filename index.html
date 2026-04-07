@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>視力検査</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: linear-gradient(135deg, #22d3ee22, #8b5cf622); min-height: 100vh; }
+  #app { text-align: center; padding: 1.5rem 1rem; font-family: sans-serif; color: #111; }
+  h2 { font-size: 22px; font-weight: 500; margin: 0 0 0.25rem; }
+  #sub { font-size: 14px; color: #666; margin: 0 0 1.5rem; }
+  #canvas-wrap { display: flex; align-items: center; justify-content: center; height: 180px; margin: 1rem 0; }
+  canvas { display: block; }
+  #msg { font-size: 18px; font-weight: 500; min-height: 32px; margin: 0.5rem 0; }
+  #score-row { font-size: 14px; color: #666; margin-bottom: 1rem; }
+  #gp-status { font-size: 12px; color: #999; margin-bottom: 1rem; }
+  .acuity-label { font-size: 13px; color: #666; margin-bottom: 0.5rem; }
+  #progress { display: flex; gap: 8px; justify-content: center; margin-bottom: 1.5rem; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #ccc; background: #eee; }
+  .dot.ok { background: #1D9E75; border-color: #1D9E75; }
+  .dot.ng { background: #E24B4A; border-color: #E24B4A; }
+  .dot.cur { border-color: #378ADD; }
+  #start-hint { margin: 1rem auto; max-width: 320px; padding: 0.75rem 1rem; background: #f5f5f5; border-radius: 8px; font-size: 14px; color: #555; }
+  #result-box { max-width: 320px; margin: 1rem auto; padding: 1rem; background: #f5f5f5; border-radius: 12px; display: none; }
+  #result-box h3 { font-size: 18px; font-weight: 500; margin: 0 0 0.5rem; }
+  #result-box p { font-size: 14px; color: #666; margin: 0; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h2>～視力検査～</h2>
+  <p id="sub">5m離れて画面を見てください</p>
+  <div id="gp-status">コントローラー: 未接続</div>
+  <div id="progress"></div>
+  <div class="acuity-label" id="acuity-label"></div>
+  <div id="canvas-wrap"><canvas id="c" width="180" height="180"></canvas></div>
+  <div id="msg">コントローラーを接続して<br>いずれかのボタンで開始</div>
+  <div id="score-row"></div>
+  <div id="result-box">
+    <h3 id="result-title"></h3>
+    <p id="result-detail"></p>
+  </div>
+  <div id="start-hint">
+    <strong>操作方法:</strong> 十字キーの上下左右で回答
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const msgEl = document.getElementById('msg');
+const scoreRowEl = document.getElementById('score-row');
+const progressEl = document.getElementById('progress');
+const acuityEl = document.getElementById('acuity-label');
+const gpStatusEl = document.getElementById('gp-status');
+const resultBox = document.getElementById('result-box');
+const resultTitle = document.getElementById('result-title');
+const resultDetail = document.getElementById('result-detail');
+
+// 視力レベル定義（acuity: 視力値, px: 環のサイズ）
+const LEVELS = [
+  { acuity: 0.1, px: 140 },
+  { acuity: 0.3, px: 80 },
+  { acuity: 0.5, px: 55 },
+  { acuity: 0.7, px: 38 },
+  { acuity: 1.0, px: 28 },
+  { acuity: 1.5, px: 18 },
+  { acuity: 2.0, px: 13 },
+];
+
+const DIRS = ['up', 'down', 'left', 'right'];
+const BTNS = { up: 12, down: 13, left: 14, right: 15 };
+
+let levelIdx = 0;
+let score = 0;
+let gameActive = false;
+let curDir = '';
+let prevPressed = {};
+let answered = false;
+let results = [];
+
+// ランドルト環をCanvasで描画
+function drawLandolt(dir, sizePx) {
+  ctx.clearRect(0, 0, 180, 180);
+  const cx = 90, cy = 90;
+  const r = sizePx / 2;
+  const gap = r * 0.25;
+  const lineW = r * 0.2;
+
+  const angles = { up: Math.PI * 0.5, down: Math.PI * 1.5, left: Math.PI, right: 0 };
+  const gapAngle = angles[dir];
+  const halfGap = Math.asin(gap / r);
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, gapAngle + halfGap, gapAngle - halfGap + Math.PI * 2);
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = lineW;
+  ctx.stroke();
+}
+
+function clearCanvas() {
+  ctx.clearRect(0, 0, 180, 180);
+}
+
+function buildProgress() {
+  progressEl.innerHTML = '';
+  LEVELS.forEach((l, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot'
+      + (i === levelIdx ? ' cur' : '')
+      + (results[i] === true ? ' ok' : results[i] === false ? ' ng' : '');
+    d.title = '視力 ' + l.acuity;
+    progressEl.appendChild(d);
+  });
+}
+
+function nextQuestion() {
+  if (levelIdx >= LEVELS.length) { endGame(); return; }
+  answered = false;
+  const lv = LEVELS[levelIdx];
+  curDir = DIRS[Math.floor(Math.random() * DIRS.length)];
+  drawLandolt(curDir, lv.px);
+  acuityEl.textContent = '視力 ' + lv.acuity;
+  msgEl.innerHTML = 'どの方向に開いていますか？';
+  scoreRowEl.textContent = '';
+  buildProgress();
+}
+
+function onCorrect() {
+  results[levelIdx] = true;
+  score++;
+  msgEl.innerHTML = '✓ 正解！';
+  clearCanvas();
+  levelIdx++;
+  buildProgress();
+  setTimeout(nextQuestion, 600);
+}
+
+function onWrong() {
+  results[levelIdx] = false;
+  const label = { up:'上', down:'下', left:'左', right:'右' };
+  msgEl.innerHTML = '✗ 不正解 (正解: ' + label[curDir] + ')';
+  clearCanvas();
+  levelIdx++;
+  buildProgress();
+  setTimeout(nextQuestion, 800);
+}
+
+function endGame() {
+  gameActive = false;
+  clearCanvas();
+  acuityEl.textContent = '';
+  msgEl.innerHTML = '検査終了';
+  let bestAcuity = 0;
+  LEVELS.forEach((lv, i) => {
+    if (results[i] === true && lv.acuity > bestAcuity) bestAcuity = lv.acuity;
+  });
+  resultTitle.textContent = 'あなたの視力: 約 ' + bestAcuity;
+  resultDetail.textContent = '5m離れた距離での簡易テスト結果です。正確な視力は眼科で検査してください。';
+  resultBox.style.display = 'block';
+  buildProgress();
+}
+
+function startGame() {
+  if (gameActive) return;
+  gameActive = true;
+  levelIdx = 0;
+  score = 0;
+  results = [];
+  resultBox.style.display = 'none';
+  nextQuestion();
+}
+
+// ボタンの「押した瞬間」だけ検出（連続発火防止）
+function checkDir(gp, dir) {
+  const idx = BTNS[dir];
+  const isPressed = gp.buttons[idx] && gp.buttons[idx].pressed;
+  const wasPressed = prevPressed[dir];
+  prevPressed[dir] = isPressed;
+  return isPressed && !wasPressed;
+}
+
+function pollGamepad() {
+  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  let connected = false;
+  for (let i = 0; i < gps.length; i++) {
+    const gp = gps[i];
+    if (!gp) continue;
+    connected = true;
+    gpStatusEl.textContent = 'コントローラー: 接続中 (' + gp.id.substring(0, 30) + ')';
+
+    if (!gameActive) {
+      // どのボタンでもゲーム開始
+      for (let b = 0; b < gp.buttons.length; b++) {
+        if (gp.buttons[b].pressed && !prevPressed['any_' + b]) {
+          prevPressed['any_' + b] = true;
+          startGame();
+        } else if (!gp.buttons[b].pressed) {
+          prevPressed['any_' + b] = false;
+        }
+      }
+    } else if (!answered) {
+      if (checkDir(gp, 'up'))    { answered = true; curDir === 'up'    ? onCorrect() : onWrong(); }
+      else if (checkDir(gp, 'down'))  { answered = true; curDir === 'down'  ? onCorrect() : onWrong(); }
+      else if (checkDir(gp, 'left'))  { answered = true; curDir === 'left'  ? onCorrect() : onWrong(); }
+      else if (checkDir(gp, 'right')) { answered = true; curDir === 'right' ? onCorrect() : onWrong(); }
+      else {
+        // 押されていないときは前状態をリセット
+        prevPressed.up    = gp.buttons[BTNS.up]?.pressed;
+        prevPressed.down  = gp.buttons[BTNS.down]?.pressed;
+        prevPressed.left  = gp.buttons[BTNS.left]?.pressed;
+        prevPressed.right = gp.buttons[BTNS.right]?.pressed;
+      }
+    }
+    break;
+  }
+  if (!connected) gpStatusEl.textContent = 'コントローラー: 未接続';
+  requestAnimationFrame(pollGamepad);
+}
+
+window.addEventListener('gamepadconnected', e => {
+  gpStatusEl.textContent = 'コントローラー: 接続中 (' + e.gamepad.id.substring(0, 30) + ')';
+});
+window.addEventListener('gamepaddisconnected', () => {
+  gpStatusEl.textContent = 'コントローラー: 切断';
+});
+
+buildProgress();
+pollGamepad();
+</script>
+</body>
+</html>
