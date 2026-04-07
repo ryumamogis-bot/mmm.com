@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>完全版視力検査</title>
+<title>視力検査</title>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: linear-gradient(135deg, #22d3ee22, #8b5cf622); min-height: 100vh; }
@@ -174,16 +174,20 @@ function startGame() {
   nextQuestion();
 }
 
-function checkDir(gp, dir) {
-  const idx = BTNS[dir];
-  const isPressed = gp.buttons[idx] && gp.buttons[idx].pressed;
-  const wasPressed = prevPressed[dir] || false;
-  prevPressed[dir] = isPressed;
-  return (!isPressed && wasPressed);
+function getReleasedButton(gp) {
+  let released = null;
+  for (const dir of DIRS) {
+    const idx = BTNS[dir];
+    const isPressed = gp.buttons[idx].pressed;
+    const wasPressed = prevPressed[idx] || false;
+    if (!isPressed && wasPressed) released = dir;
+    prevPressed[idx] = isPressed;
+  }
+  return released;
 }
 
 function pollGamepad() {
-  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  const gps = navigator.getGamepads();
   let connected = false;
   for (let i = 0; i < gps.length; i++) {
     const gp = gps[i];
@@ -201,10 +205,11 @@ function pollGamepad() {
         }
       }
     } else if (!answered) {
-      if (checkDir(gp, 'up'))    { answered = true; curDir === 'up'    ? onCorrect() : onWrong(); }
-      else if (checkDir(gp, 'down'))  { answered = true; curDir === 'down'  ? onCorrect() : onWrong(); }
-      else if (checkDir(gp, 'left'))  { answered = true; curDir === 'left'  ? onCorrect() : onWrong(); }
-      else if (checkDir(gp, 'right')) { answered = true; curDir === 'right' ? onCorrect() : onWrong(); }
+      const dir = getReleasedButton(gp);
+      if (dir) {
+        answered = true;
+        curDir === dir ? onCorrect() : onWrong();
+      }
     }
     break;
   }
