@@ -30,7 +30,7 @@
 <body>
 <div id="app">
   <h2>～視力検査～</h2>
-  <p id="sub">5m離れて画面を見てください</p>
+  <p id="sub">3m離れて画面を見てください</p>
   <div id="gp-status">コントローラー: 未接続</div>
   <div id="progress"></div>
   <div class="acuity-label" id="acuity-label"></div>
@@ -58,15 +58,14 @@ const resultBox = document.getElementById('result-box');
 const resultTitle = document.getElementById('result-title');
 const resultDetail = document.getElementById('result-detail');
 
-// 視力レベル定義（acuity: 視力値, px: 環のサイズ）
 const LEVELS = [
-  { acuity: 0.1, px: 140 },
-  { acuity: 0.3, px: 80 },
-  { acuity: 0.5, px: 55 },
-  { acuity: 0.7, px: 38 },
-  { acuity: 1.0, px: 28 },
-  { acuity: 1.5, px: 18 },
-  { acuity: 2.0, px: 13 },
+  { acuity: 0.06, px: 140 },
+  { acuity: 0.18, px: 80 },
+  { acuity: 0.30, px: 55 },
+  { acuity: 0.42, px: 38 },
+  { acuity: 0.60, px: 28 },
+  { acuity: 0.90, px: 18 },
+  { acuity: 1.20, px: 13 },
 ];
 
 const DIRS = ['up', 'down', 'left', 'right'];
@@ -80,18 +79,15 @@ let prevPressed = {};
 let answered = false;
 let results = [];
 
-// ランドルト環をCanvasで描画
 function drawLandolt(dir, sizePx) {
   ctx.clearRect(0, 0, 180, 180);
   const cx = 90, cy = 90;
   const r = sizePx / 2;
   const gap = r * 0.25;
   const lineW = r * 0.2;
-
   const angles = { up: Math.PI * 0.5, down: Math.PI * 1.5, left: Math.PI, right: 0 };
   const gapAngle = angles[dir];
   const halfGap = Math.asin(gap / r);
-
   ctx.beginPath();
   ctx.arc(cx, cy, r, gapAngle + halfGap, gapAngle - halfGap + Math.PI * 2);
   ctx.strokeStyle = '#111';
@@ -157,7 +153,7 @@ function endGame() {
     if (results[i] === true && lv.acuity > bestAcuity) bestAcuity = lv.acuity;
   });
   resultTitle.textContent = 'あなたの視力: 約 ' + bestAcuity;
-  resultDetail.textContent = '5m離れた距離での簡易テスト結果です。正確な視力は眼科で検査してください。';
+  resultDetail.textContent = '3m距離での簡易テスト結果です。正確な視力は眼科で検査してください。';
   resultBox.style.display = 'block';
   buildProgress();
 }
@@ -172,7 +168,6 @@ function startGame() {
   nextQuestion();
 }
 
-// ボタンの「押した瞬間」だけ検出（連続発火防止）
 function checkDir(gp, dir) {
   const idx = BTNS[dir];
   const isPressed = gp.buttons[idx] && gp.buttons[idx].pressed;
@@ -191,7 +186,6 @@ function pollGamepad() {
     gpStatusEl.textContent = 'コントローラー: 接続中 (' + gp.id.substring(0, 30) + ')';
 
     if (!gameActive) {
-      // どのボタンでもゲーム開始
       for (let b = 0; b < gp.buttons.length; b++) {
         if (gp.buttons[b].pressed && !prevPressed['any_' + b]) {
           prevPressed['any_' + b] = true;
@@ -206,7 +200,6 @@ function pollGamepad() {
       else if (checkDir(gp, 'left'))  { answered = true; curDir === 'left'  ? onCorrect() : onWrong(); }
       else if (checkDir(gp, 'right')) { answered = true; curDir === 'right' ? onCorrect() : onWrong(); }
       else {
-        // 押されていないときは前状態をリセット
         prevPressed.up    = gp.buttons[BTNS.up]?.pressed;
         prevPressed.down  = gp.buttons[BTNS.down]?.pressed;
         prevPressed.left  = gp.buttons[BTNS.left]?.pressed;
