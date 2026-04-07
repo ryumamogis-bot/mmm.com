@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEW視力検査</title>
+<title>視力検査</title>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: linear-gradient(135deg, #22d3ee22, #8b5cf622); min-height: 100vh; }
@@ -177,9 +177,9 @@ function startGame() {
 function checkDir(gp, dir) {
   const idx = BTNS[dir];
   const isPressed = gp.buttons[idx] && gp.buttons[idx].pressed;
-  const wasPressed = prevPressed[dir];
+  const wasPressed = prevPressed[dir] || false;
   prevPressed[dir] = isPressed;
-  return isPressed && !wasPressed;
+  return (!isPressed && wasPressed);
 }
 
 function pollGamepad() {
@@ -205,12 +205,6 @@ function pollGamepad() {
       else if (checkDir(gp, 'down'))  { answered = true; curDir === 'down'  ? onCorrect() : onWrong(); }
       else if (checkDir(gp, 'left'))  { answered = true; curDir === 'left'  ? onCorrect() : onWrong(); }
       else if (checkDir(gp, 'right')) { answered = true; curDir === 'right' ? onCorrect() : onWrong(); }
-      else {
-        prevPressed.up    = gp.buttons[BTNS.up]?.pressed;
-        prevPressed.down  = gp.buttons[BTNS.down]?.pressed;
-        prevPressed.left  = gp.buttons[BTNS.left]?.pressed;
-        prevPressed.right = gp.buttons[BTNS.right]?.pressed;
-      }
     }
     break;
   }
